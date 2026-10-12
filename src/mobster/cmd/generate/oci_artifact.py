@@ -172,6 +172,30 @@ class GenerateOciArtifactCommand(GenerateCommandWithOutputTypeSelector):
         return document
 
     @staticmethod
+    def _check_folded_checksums(artifact_package: Package, root_pkg: Package) -> None:
+        """
+        A content root that records the checksum of the built artifact (e.g.
+        image-builder build --with-sbom) must describe the same file as the
+        artifact being pushed. Fail on a mismatch instead of producing an SBOM
+        that describes a different file.
+        """
+        artifact_sums = {c.algorithm: c.value for c in artifact_package.checksums}
+        for checksum in root_pkg.checksums:
+            have = artifact_sums.get(checksum.algorithm)
+            if have is None:
+                artifact_package.checksums.append(checksum)
+            elif have != checksum.value:
+                raise ValueError(
+                    f"Content SBOM root {root_pkg.spdx_id} records "
+                    f"{checksum.algorithm.name} {checksum.value}, but the artifact "
+                    f"{artifact_package.name} has {have}"
+                )
+        if root_pkg.checksums:
+            LOGGER.info(
+                "Content SBOM root checksum matches artifact %s", artifact_package.name
+            )
+
+    @staticmethod
     def merge_content_sbom(
         document: Document,
         artifact_package: Package,
@@ -217,6 +241,12 @@ class GenerateOciArtifactCommand(GenerateCommandWithOutputTypeSelector):
                 artifact_package.primary_package_purpose = (
                     root_pkg.primary_package_purpose
                 )
+            GenerateOciArtifactCommand._check_folded_checksums(
+                artifact_package, root_pkg
+            )
+            for ann in content.annotations:
+                if ann.spdx_id == folded:
+                    ann.spdx_id = artifact_package.spdx_id
             content.packages = [p for p in content.packages if p.spdx_id != folded]
             content.relationships = [
                 r
@@ -251,6 +281,27 @@ class GenerateOciArtifactCommand(GenerateCommandWithOutputTypeSelector):
                 )
             else:
                 document.relationships.append(rel)
+        # Keep package annotations (e.g. osbuild's "download_url: ..." or
+        # sigmd5 annotations, Red Hat SBOM guide "RPM").
+        for ann in content.annotations:
+            if ann not in document.annotations:
+                document.annotations.append(ann)
+        # Keep the content SBOM's generation context (CISA 2026 minimum element).
+        if content.creation_info.creator_comment and not (
+            document.creation_info.creator_comment
+        ):
+            document.creation_info.creator_comment = (
+                content.creation_info.creator_comment
+            )
+        # Keep references to linked SBOMs (e.g. osbuild's build-root SBOM,
+        # related via "DocumentRef-...:SPDXRef-DOCUMENT BUILD_TOOL_OF <root>").
+        known_refs = {
+            ref.document_ref_id for ref in document.creation_info.external_document_refs
+        }
+        for doc_ref in content.creation_info.external_document_refs:
+            if doc_ref.document_ref_id not in known_refs:
+                document.creation_info.external_document_refs.append(doc_ref)
+                known_refs.add(doc_ref.document_ref_id)
         known_lics = {lic.license_id for lic in document.extracted_licensing_info}
         for lic in content.extracted_licensing_info:
             if lic.license_id not in known_lics:
@@ -258,6 +309,13 @@ class GenerateOciArtifactCommand(GenerateCommandWithOutputTypeSelector):
         for creator in content.creation_info.creators:
             if creator not in document.creation_info.creators:
                 document.creation_info.creators.append(creator)
+        if (
+            document.creation_info.license_list_version is None
+            and content.creation_info.license_list_version is not None
+        ):
+            document.creation_info.license_list_version = (
+                content.creation_info.license_list_version
+            )
         if not artifact_package.version and len(roots) == 1:
             root = next(p for p in document.packages if p.spdx_id == roots[0])
             artifact_package.version = root.version
