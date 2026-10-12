@@ -395,6 +395,13 @@ def generate_oci_artifact_parser(subparsers: Any) -> None:
         help="SPDX primaryPackagePurpose to set on the artifact packages "
         "(e.g. FILE for a disk image file).",
     )
+    oci_artifact_parser.add_argument(
+        "--fold-content-root",
+        action="store_true",
+        help="Fold the single root described by the --from-sbom content SBOM "
+        "(e.g. osbuild's logical OS package) into the artifact package instead "
+        "of nesting it, so every package carries a checksum.",
+    )
     oci_artifact_parser.set_defaults(func=oci_artifact.GenerateOciArtifactCommand)
 
 

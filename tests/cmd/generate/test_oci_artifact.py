@@ -70,6 +70,7 @@ async def test_GenerateOciArtifactCommand_from_sbom_disk_image() -> None:
     args.sbom_type = "spdx"
     args.from_sbom = [data / "fedora-qcow2.image-os.spdx.json"]
     args.artifact_purpose = "FILE"
+    args.fold_content_root = False
 
     command = GenerateOciArtifactCommand(args)
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -94,6 +95,43 @@ async def test_GenerateOciArtifactCommand_from_sbom_disk_image() -> None:
     assert "Tool: osbuild-194" in result["creationInfo"]["creators"]
     root_contains = [r for r in rels if r[:2] == ("SPDXRef-image-root", "CONTAINS")]
     assert len(root_contains) == 3
+
+
+@pytest.mark.asyncio
+async def test_GenerateOciArtifactCommand_from_sbom_fold_root() -> None:
+    """--fold-content-root merges the checksum-less OS root into the artifact."""
+    data = pathlib.Path(__file__).parent.parent.parent / "data" / "osbuild"
+    args = MagicMock()
+    args.oci_copy_yaml = data / "qcow2-oci-copy.yaml"
+    args.image_pullspec = "quay.io/example/fedora-qcow2:44"
+    args.image_digest = "sha256:" + "b" * 64
+    args.sbom_type = "spdx"
+    args.from_sbom = [data / "fedora-qcow2.image-os.spdx.json"]
+    args.artifact_purpose = None
+    args.fold_content_root = True
+
+    command = GenerateOciArtifactCommand(args)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        args.output = pathlib.Path(temp_dir) / "out.json"
+        await command.execute()
+        await command.save()
+        with open(args.output, encoding="utf8") as result_file:
+            result = json.load(result_file)
+
+    pkgs = {p["SPDXID"]: p for p in result["packages"]}
+    assert "SPDXRef-image-root" not in pkgs
+    disk = next(p for p in pkgs.values() if p["name"] == "disk.qcow2")
+    assert disk["primaryPackagePurpose"] == "OPERATING_SYSTEM"
+    assert disk["versionInfo"] == "44"
+    assert any(
+        r["referenceLocator"].startswith("pkg:generic/") for r in disk["externalRefs"]
+    )
+    rels = {
+        (r["spdxElementId"], r["relationshipType"], r["relatedSpdxElement"])
+        for r in result["relationships"]
+    }
+    assert not any("SPDXRef-image-root" in (r[0], r[2]) for r in rels)
+    assert len([r for r in rels if r[:2] == (disk["SPDXID"], "CONTAINS")]) == 3
 
 
 @pytest.mark.asyncio

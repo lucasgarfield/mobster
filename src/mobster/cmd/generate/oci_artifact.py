@@ -162,13 +162,21 @@ class GenerateOciArtifactCommand(GenerateCommandWithOutputTypeSelector):
                     "--from-sbom requires exactly one artifact in the oci-copy YAML"
                 )
             for content_sbom in self.content_sboms:
-                self.merge_content_sbom(document, artifact_packages[0], content_sbom)
+                self.merge_content_sbom(
+                    document,
+                    artifact_packages[0],
+                    content_sbom,
+                    fold_root=bool(getattr(self.cli_args, "fold_content_root", False)),
+                )
 
         return document
 
     @staticmethod
     def merge_content_sbom(
-        document: Document, artifact_package: Package, content_sbom_path: Path
+        document: Document,
+        artifact_package: Package,
+        content_sbom_path: Path,
+        fold_root: bool = False,
     ) -> None:
         """
         Merge an SPDX content SBOM (e.g. from osbuild/image-builder describing
@@ -177,6 +185,12 @@ class GenerateOciArtifactCommand(GenerateCommandWithOutputTypeSelector):
         Every element DESCRIBED by the content SBOM becomes CONTAINED by the
         artifact package. If the artifact package has no version, it inherits
         the version of the single described content root (if any).
+
+        With fold_root, a single described content root (e.g. osbuild's logical
+        OPERATING_SYSTEM package, which has no checksum because the disk digest
+        is unknown at manifest time) is folded into the artifact package: its
+        purl is added to the artifact, its relationships are re-pointed to the
+        artifact, and the root package itself is dropped.
         """
         with open(content_sbom_path, encoding="utf-8") as sbom_file:
             content = JsonLikeDictParser().parse(  # type: ignore[no-untyped-call]
@@ -184,6 +198,39 @@ class GenerateOciArtifactCommand(GenerateCommandWithOutputTypeSelector):
             )
         existing_ids = {pkg.spdx_id for pkg in document.packages}
         content_doc_id = content.creation_info.spdx_id
+        described = [
+            r.related_spdx_element_id
+            for r in content.relationships
+            if r.relationship_type == RelationshipType.DESCRIBES
+            and r.spdx_element_id == content_doc_id
+        ]
+        folded: str | None = None
+        if fold_root and len(described) == 1 and isinstance(described[0], str):
+            folded = described[0]
+            root_pkg = next(p for p in content.packages if p.spdx_id == folded)
+            for ref in root_pkg.external_references:
+                if ref not in artifact_package.external_references:
+                    artifact_package.external_references.append(ref)
+            if not artifact_package.version:
+                artifact_package.version = root_pkg.version
+            if artifact_package.primary_package_purpose is None:
+                artifact_package.primary_package_purpose = (
+                    root_pkg.primary_package_purpose
+                )
+            content.packages = [p for p in content.packages if p.spdx_id != folded]
+            content.relationships = [
+                r
+                for r in content.relationships
+                if not (
+                    r.relationship_type == RelationshipType.DESCRIBES
+                    and r.related_spdx_element_id == folded
+                )
+            ]
+            for r in content.relationships:
+                if r.spdx_element_id == folded:
+                    r.spdx_element_id = artifact_package.spdx_id
+                if r.related_spdx_element_id == folded:
+                    r.related_spdx_element_id = artifact_package.spdx_id
         roots = []
         for package in content.packages:
             if package.spdx_id not in existing_ids:
