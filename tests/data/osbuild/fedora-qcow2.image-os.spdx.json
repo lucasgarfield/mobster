@@ -1,0 +1,135 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "creationInfo": {
+    "created": "2026-10-12T18:47:46Z",
+    "creators": [
+      "Tool: osbuild-194"
+    ]
+  },
+  "dataLicense": "CC0-1.0",
+  "name": "fedora-44-qcow2-x86_64",
+  "spdxVersion": "SPDX-2.3",
+  "documentNamespace": "https://osbuild.org/spdxdocs/fedora-44-qcow2-x86_64-d1745ab7-2ccd-4fa0-a0ad-1638818d2bef",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-image-root",
+      "name": "fedora-44-qcow2-x86_64",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "versionInfo": "44",
+      "licenseDeclared": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/fedora-44-qcow2-x86_64@44?arch=x86_64&distro=fedora-44&image_type=qcow2"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe22Type",
+          "referenceLocator": "cpe:/o:fedoraproject:fedora:44"
+        }
+      ],
+      "primaryPackagePurpose": "OPERATING_SYSTEM"
+    },
+    {
+      "SPDXID": "SPDXRef-9fc63206-ac96-328a-82e3-49b5a7465144",
+      "name": "glibc",
+      "downloadLocation": "https://mirrors.fedoraproject.org/f44/x86_64/glibc.rpm",
+      "filesAnalyzed": false,
+      "versionInfo": "2.43-1.fc44",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "sourceInfo": "Source RPM: glibc-2.43-1.fc44.src.rpm",
+      "licenseDeclared": "LGPL-2.1-or-later",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:rpm/fedora/glibc@2.43-1.fc44?arch=x86_64&repository_url=https://mirrors.fedoraproject.org/f44/x86_64/"
+        }
+      ],
+      "builtDate": "2025-12-31T22:00:00Z"
+    },
+    {
+      "SPDXID": "SPDXRef-59f8a785-6e81-370e-9d16-ae9bc17c613f",
+      "name": "bash",
+      "downloadLocation": "https://mirrors.fedoraproject.org/f44/x86_64/bash.rpm",
+      "filesAnalyzed": false,
+      "versionInfo": "5.3-2.fc44",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "sourceInfo": "Source RPM: bash-5.3-2.fc44.src.rpm",
+      "licenseDeclared": "GPL-3.0-or-later",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:rpm/fedora/bash@5.3-2.fc44?arch=x86_64&repository_url=https://mirrors.fedoraproject.org/f44/x86_64/"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-f10fd002-eae6-3ab8-8436-18c4d15feff9",
+      "name": "kernel-core",
+      "downloadLocation": "https://mirrors.fedoraproject.org/f44/x86_64/k.rpm",
+      "filesAnalyzed": false,
+      "versionInfo": "6.17.1-300.fc44",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      ],
+      "licenseDeclared": "LicenseRef-5fc12a33901726b987afb2d054d9850a4be1a22b8a780858e4e72ecd4ff4c586",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:rpm/fedora/kernel-core@6.17.1-300.fc44?arch=x86_64&repository_url=https://mirrors.fedoraproject.org/f44/x86_64/"
+        }
+      ]
+    }
+  ],
+  "hasExtractedLicensingInfos": [
+    {
+      "licenseId": "LicenseRef-5fc12a33901726b987afb2d054d9850a4be1a22b8a780858e4e72ecd4ff4c586",
+      "extractedText": "GPL-2.0-only and weird"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-image-root"
+    },
+    {
+      "spdxElementId": "SPDXRef-image-root",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-9fc63206-ac96-328a-82e3-49b5a7465144"
+    },
+    {
+      "spdxElementId": "SPDXRef-image-root",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-59f8a785-6e81-370e-9d16-ae9bc17c613f"
+    },
+    {
+      "spdxElementId": "SPDXRef-59f8a785-6e81-370e-9d16-ae9bc17c613f",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-9fc63206-ac96-328a-82e3-49b5a7465144"
+    },
+    {
+      "spdxElementId": "SPDXRef-image-root",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-f10fd002-eae6-3ab8-8436-18c4d15feff9"
+    }
+  ]
+}

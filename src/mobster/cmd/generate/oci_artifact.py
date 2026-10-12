@@ -1,13 +1,19 @@
 """A module for generating SBOM documents for OCI artifact images."""
 
+import json
 import logging
+from pathlib import Path
 from typing import Any
 
 import yaml
 from cyclonedx.model.bom import Bom
 from cyclonedx.model.dependency import Dependency
 from spdx_tools.spdx.model.document import Document
+from spdx_tools.spdx.model.package import Package, PackagePurpose
 from spdx_tools.spdx.model.relationship import Relationship, RelationshipType
+from spdx_tools.spdx.parser.jsonlikedict.json_like_dict_parser import (
+    JsonLikeDictParser,
+)
 
 from mobster.artifact import Artifact
 from mobster.cmd.generate.base import GenerateCommandWithOutputTypeSelector
@@ -40,6 +46,20 @@ class GenerateOciArtifactCommand(GenerateCommandWithOutputTypeSelector):
         self._content = sbom
         return self.content
 
+    @property
+    def content_sboms(self) -> list[Path]:
+        """Content SBOMs (e.g. osbuild/image-builder) describing the artifact."""
+        value = getattr(self.cli_args, "from_sbom", None)
+        return list(value) if isinstance(value, list) else []
+
+    @property
+    def artifact_purpose(self) -> PackagePurpose | None:
+        """Optional SPDX primaryPackagePurpose for the artifact packages."""
+        value = getattr(self.cli_args, "artifact_purpose", None)
+        if not isinstance(value, str):
+            return None
+        return PackagePurpose[value.upper().replace("-", "_")]
+
     def to_sbom(self, oci_image: Image, artifacts: list[Artifact]) -> Any:
         """
         Generate an SBOM document for oci artifact.
@@ -54,6 +74,8 @@ class GenerateOciArtifactCommand(GenerateCommandWithOutputTypeSelector):
             based on the command line arguments.
         """
         if self.cli_args.sbom_type == "cyclonedx":
+            if self.content_sboms:
+                raise ValueError("--from-sbom is only supported with --sbom-type spdx")
             return self.to_cyclonedx(oci_image, artifacts)
         return self.to_spdx(oci_image, artifacts)
 
@@ -130,7 +152,68 @@ class GenerateOciArtifactCommand(GenerateCommandWithOutputTypeSelector):
             relationships=relationships,
         )
 
+        for package in artifact_packages:
+            if self.artifact_purpose is not None:
+                package.primary_package_purpose = self.artifact_purpose
+
+        if self.content_sboms:
+            if len(artifact_packages) != 1:
+                raise ValueError(
+                    "--from-sbom requires exactly one artifact in the oci-copy YAML"
+                )
+            for content_sbom in self.content_sboms:
+                self.merge_content_sbom(document, artifact_packages[0], content_sbom)
+
         return document
+
+    @staticmethod
+    def merge_content_sbom(
+        document: Document, artifact_package: Package, content_sbom_path: Path
+    ) -> None:
+        """
+        Merge an SPDX content SBOM (e.g. from osbuild/image-builder describing
+        the content of a disk image) into the document under the artifact.
+
+        Every element DESCRIBED by the content SBOM becomes CONTAINED by the
+        artifact package. If the artifact package has no version, it inherits
+        the version of the single described content root (if any).
+        """
+        with open(content_sbom_path, encoding="utf-8") as sbom_file:
+            content = JsonLikeDictParser().parse(  # type: ignore[no-untyped-call]
+                json.load(sbom_file)
+            )
+        existing_ids = {pkg.spdx_id for pkg in document.packages}
+        content_doc_id = content.creation_info.spdx_id
+        roots = []
+        for package in content.packages:
+            if package.spdx_id not in existing_ids:
+                document.packages.append(package)
+                existing_ids.add(package.spdx_id)
+        for rel in content.relationships:
+            if (
+                rel.relationship_type == RelationshipType.DESCRIBES
+                and rel.spdx_element_id == content_doc_id
+            ):
+                roots.append(rel.related_spdx_element_id)
+                document.relationships.append(
+                    Relationship(
+                        spdx_element_id=artifact_package.spdx_id,
+                        relationship_type=RelationshipType.CONTAINS,
+                        related_spdx_element_id=rel.related_spdx_element_id,
+                    )
+                )
+            else:
+                document.relationships.append(rel)
+        known_lics = {lic.license_id for lic in document.extracted_licensing_info}
+        for lic in content.extracted_licensing_info:
+            if lic.license_id not in known_lics:
+                document.extracted_licensing_info.append(lic)
+        for creator in content.creation_info.creators:
+            if creator not in document.creation_info.creators:
+                document.creation_info.creators.append(creator)
+        if not artifact_package.version and len(roots) == 1:
+            root = next(p for p in document.packages if p.spdx_id == roots[0])
+            artifact_package.version = root.version
 
     def get_artifact_relationship(
         self, spdx_id: str, oci_image_spdx_id: str
