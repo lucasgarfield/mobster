@@ -373,6 +373,35 @@ def generate_oci_artifact_parser(subparsers: Any) -> None:
         help="Type of SBOM to generate (default: cyclonedx)",
     )
 
+    oci_artifact_parser.add_argument(
+        "--from-sbom",
+        type=Path,
+        action="append",
+        help="Path to an SPDX content SBOM describing the (single) artifact, e.g. "
+        "the image SBOM produced by osbuild/image-builder for a disk image. "
+        "Can be specified multiple times. SPDX only.",
+    )
+    oci_artifact_parser.add_argument(
+        "--artifact-purpose",
+        choices=[
+            "OPERATING-SYSTEM",
+            "FILE",
+            "ARCHIVE",
+            "FIRMWARE",
+            "INSTALL",
+            "DEVICE",
+            "OTHER",
+        ],
+        help="SPDX primaryPackagePurpose to set on the artifact packages "
+        "(e.g. FILE for a disk image file).",
+    )
+    oci_artifact_parser.add_argument(
+        "--fold-content-root",
+        action="store_true",
+        help="Fold the single root described by the --from-sbom content SBOM "
+        "(e.g. osbuild's logical OS package) into the artifact package instead "
+        "of nesting it, so every package carries a checksum.",
+    )
     oci_artifact_parser.set_defaults(func=oci_artifact.GenerateOciArtifactCommand)
 
 

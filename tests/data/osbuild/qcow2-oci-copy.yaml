@@ -1,0 +1,6 @@
+artifact_type: application/vnd.diskimage.qcow2
+artifacts:
+  - source: https://example.com/fedora-44.qcow2
+    filename: disk.qcow2
+    type: application/vnd.diskimage.qcow2
+    sha256sum: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
